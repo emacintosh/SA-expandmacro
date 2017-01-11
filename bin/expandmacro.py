@@ -7,6 +7,11 @@ class ExpandMacros(GeneratingCommand):
 	# macro can be supplied in the search
 	# if not, we'll just list all of the macros
 	macro = Option(require=False)
+
+        # limit the number of levels of macros do expand
+        # can be supplied in the command and default to 10 if not
+        # should help to eliminate infinite loops for circurlarly defined macros (if those are possible)
+	max_level = Option(require=False, validate=validators.Integer())
 	
 	# internal array for the list of all of the macros
 	macroList = []
@@ -92,7 +97,6 @@ class ExpandMacros(GeneratingCommand):
 	def expandMacro(self):
 		# We'll return every level of the macro expansion
 		# and so we want to have the level as part of the return object
-		# and so we'll start with level 1
 		level = 1
 		
 		# expandedMacro is our array of dictionary objecst that will be returned
@@ -114,7 +118,7 @@ class ExpandMacros(GeneratingCommand):
 			#definition = "`"+ self.macro + "`"
 			# Now starting with the fast first definition, let's keep going until
 			# we get a definition that contains no macros, because then we're done
-			while "`" in definition and level <=5:
+			while "`" in definition and level <= self.max_level :
 				# find all of macros in the current definition
 				# and let's loop through them
 				for macro in self.getMacrosInString(definition):
@@ -141,6 +145,10 @@ class ExpandMacros(GeneratingCommand):
 		return expandedMacro
 		
 	def generate(self):
+		if self.max_level != None:
+			self.max_level = int(self.max_level)
+		else:
+			self.max_level = int(10)
 		self.macroList = self.getMacros()
 		if self.macro != None:
 			retList = self.expandMacro()
