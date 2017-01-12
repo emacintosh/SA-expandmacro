@@ -8,15 +8,16 @@ class ExpandMacros(GeneratingCommand):
 	# if not, we'll just list all of the macros
 	macro = Option(require=False)
 
-        # limit the number of levels of macros do expand
-        # can be supplied in the command and default to 10 if not
-        # should help to eliminate infinite loops for circurlarly defined macros (if those are possible)
+	# limit the number of levels of macros to expand
+	# can be supplied in the command and default to 10 if not
+	# should help to eliminate infinite loops for circurlarly defined macros (if those are possible)
 	max_level = Option(require=False, validate=validators.Integer())
 	
 	# internal array for the list of all of the macros
 	macroList = []
 	
 	# Method getMacros()
+	#
 	# This method should find and return all of the macros from Splunk
 	def getMacros(self):
 		# Using the splunk sdk for python, connect to to splunk
@@ -29,17 +30,17 @@ class ExpandMacros(GeneratingCommand):
 		# The macros are returned in the body of the response
 		# And are in an xml format
 		# here we loop through all of the "entry" tags
-		# looking for the name, definition and arguments of each macro
+		# looking for the name, definition, app and arguments of each macro
 		dom = parseString(response["body"].read())
 		for node in dom.getElementsByTagName('entry'):
 			name = ""
 			definition= ""
 			args = ""
 			
-			# the name in the title node on each entry element
+			# the name is in the title node on each entry element
 			name = node.getElementsByTagName('title')[0].childNodes[0].nodeValue
 			
-			# the definition and arguments (and other properties)
+			# the definition, app and arguments (and other properties)
 			# are in various "s:key" nodes
 			# so we loop through them all and set those variables if/when found
 			for dictNode in node.getElementsByTagName('s:key'):
@@ -47,14 +48,17 @@ class ExpandMacros(GeneratingCommand):
 					definition = dictNode.childNodes[0].nodeValue
 				if dictNode.getAttribute('name') == 'args':
 					args = dictNode.childNodes[0].nodeValue
+				if dictNode.getAttribute('name') == 'eai:appName':
+					app = dictNode.childNodes[0].nodeValue
 			
 			# The macro list is an array of dictionary items
-			# Each item contains the name, definition and arguments for the macro
-			macroDict = {"name":name,"definition":definition,"arguments":args}
+			# Each item contains the name, definition, arguments and app for the macro
+			macroDict = {"name":name,"definition":definition,"arguments":args,"app":app}
 			macros.append(macroDict)
 		return macros
 	
 	# Method normalizeMacroName(strMacro)
+	#
 	# This method will find whether a macro name contains parameters
 	# If it does, we count the parameters and return the actual macro name
 	# For example, mycoolmacro("foo","bar") should return mycoolmacro(2)
@@ -67,6 +71,7 @@ class ExpandMacros(GeneratingCommand):
 		return ret
 	
 	# Method getMacroParams(strMacro)
+	#
 	# Similar to normalizeMacroName but with this method
 	# instead of counting params, we just return them
 	def getMacroParams(self,strMacro):
@@ -74,6 +79,7 @@ class ExpandMacros(GeneratingCommand):
 		return matches[1:]
 		
 	# Method getMacro(strMacro)
+	#
 	# Here we're just looking through our big ol' array of macros
 	# and returning the dictionary item for the macro if found
 	def getMacro(self,strMacro):
@@ -85,13 +91,15 @@ class ExpandMacros(GeneratingCommand):
 		return ret
 	
 	# Method getMacrosInString(strMacro)
-	# giving a string, we're trying to pull out any macros
+	#
+	# given a string, we're trying to pull out any macros
 	# found in the string.
 	# This could probably be a lot more robust
 	def getMacrosInString(self,strMacro):
 		return re.findall(r'`(.+?)`',strMacro)
 	
 	# Method expandMacro()
+	#
 	# This is the main method which is handling
 	# the macro expansion
 	def expandMacro(self):
@@ -107,16 +115,14 @@ class ExpandMacros(GeneratingCommand):
 		
 		# and if we find it, let's do stuff with it
 		if currentMacro != None:
-			# get the definition for the macro, create a dictionary object with level and definition
-			# and add it to our return array
-			# I wish python had a do...loop
+			# Our level 1 definition is just the supplied macro
+			# And we the level/def to a dictionary and add it to our return array
 			definition = "`"+ self.macro + "`"
 			expandedMacroDict = { 'level':level, 'definition':definition }
 			expandedMacro.append(expandedMacroDict)
 			level+=1
 			
-			#definition = "`"+ self.macro + "`"
-			# Now starting with the fast first definition, let's keep going until
+			# Starting with our base macro, let's keep going until
 			# we get a definition that contains no macros, because then we're done
 			while "`" in definition and level <= self.max_level :
 				# find all of macros in the current definition
@@ -135,8 +141,10 @@ class ExpandMacros(GeneratingCommand):
 							params = self.getMacroParams(macro)
 							count = 0
 							for arg in dMacro["arguments"].split(","):
-								tmpDefinition = tmpDefinition.replace("$"+arg+"$",params[count])
+								tmpDefinition = tmpDefinition.replace("$"+arg.strip()+"$",params[count])
 								count += 1
+						# now that we have our expanded definition for the macro, 
+						# replace it in this level's definition
 						definition = definition.replace("`"+macro+"`", tmpDefinition)
 				expandedMacroDict = { 'level':level, 'definition':definition }
 				expandedMacro.append(expandedMacroDict)
