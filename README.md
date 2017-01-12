@@ -11,8 +11,20 @@ Since this add-on only contains a generating command, it only needs installed on
 To actually install it:
 
 1. Download the app
-2. Unzip it to $SPLUNK_HOME\etc\apps
-3. Restart splunk
+2. Unzip the app
+3. Rename it to remove the master designation
+4. If nix, you may need to set the execution bits on the python script and library (in the app's bin directory)
+5. Install the app
+  * For a standalone search head
+      * copy to $SPLUNK_HOME/etc/apps
+      * restart Splunk
+   * For a Search Head cluster
+      * On the deployer, copy to $SPLUNK_HOME/etc/shcluster/apps
+      * Apply the bundle
+
+***Note:*** *I'm new to git, so maybe there is a way for me to se the execution bits correctly.  Not sure if I can get rid of the "-master" on the download name though.*
+
+***Another Note:*** *If this command works as designed and seems helpful, I'll try to get the app on Splunkbase as well.*
 
 #Usage
 This is a generating command, so it has to be the first command in your seach and needs the preceding pipe.
